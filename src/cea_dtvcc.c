@@ -1,0 +1,165 @@
+/* SPDX-License-Identifier: GPL-2.0-only
+ * libcea — Programmatic closed-caption extraction (EIA-608 / CEA-708).
+ * Based on CCExtractor: https://github.com/CCExtractor/ccextractor
+ *
+ * Copyright (C) libcea, 2026–present.
+ * Copyright (C) CCExtractor <https://github.com/CCExtractor/ccextractor>, <2026.
+ */
+
+#include "cea_dtvcc.h"
+#include "cea_common_common.h"
+
+#include <stdlib.h>
+#include <string.h>
+
+void dtvcc_process_data(struct dtvcc_ctx *dtvcc,
+			const unsigned char *data)
+{
+	/*
+	 * Note: the data has following format:
+	 * 1 byte for cc_valid
+	 * 1 byte for cc_type
+	 * 2 bytes for the actual data
+	 */
+
+	if (!dtvcc->is_active && !dtvcc->report_enabled)
+		return;
+
+	unsigned char cc_valid = data[0];
+	unsigned char cc_type = data[1];
+
+	switch (cc_type)
+	{
+		case 2:
+			dbg_print(CEA_DMT_708, "[CEA-708] dtvcc_process_data: DTVCC Channel Packet Data\n");
+			if (cc_valid && dtvcc->is_current_packet_header_parsed)
+			{
+				if (dtvcc->current_packet_length + 2 > CEA_DTVCC_MAX_PACKET_LENGTH)
+				{
+					dbg_print(CEA_DMT_708, "[CEA-708] dtvcc_process_data: "
+										  "Warning: Legal packet size exceeded (1), data not added.\n");
+				}
+				else
+				{
+					dtvcc->current_packet[dtvcc->current_packet_length++] = data[2];
+					dtvcc->current_packet[dtvcc->current_packet_length++] = data[3];
+					int len = dtvcc->current_packet[0] & 0x3F; // 6 least significants bits
+
+					if (len == 0) // This is well defined in EIA-708; no magic.
+						len = 128;
+					else
+						len = len * 2;
+					// Note that len here is the length including the header
+
+					if (dtvcc->current_packet_length >= len)
+						dtvcc_process_current_packet(dtvcc, len);
+				}
+			}
+			break;
+		case 3:
+			dbg_print(CEA_DMT_708, "[CEA-708] dtvcc_process_data: DTVCC Channel Packet Start\n");
+			if (cc_valid)
+			{
+				if (dtvcc->current_packet_length + 2 > CEA_DTVCC_MAX_PACKET_LENGTH)
+				{
+					dbg_print(CEA_DMT_708, "[CEA-708] dtvcc_process_data: "
+										  "Warning: Legal packet size exceeded (2), data not added.\n");
+				}
+				else
+				{
+					if (dtvcc->is_current_packet_header_parsed)
+					{
+						dbg_print(CEA_DMT_708, "[CEA-708] dtvcc_process_data: "
+											  "Warning: Incorrect packet length specified. Packet will be skipped.\n");
+						dtvcc_clear_packet(dtvcc);
+					}
+					dtvcc->current_packet[dtvcc->current_packet_length++] = data[2];
+					dtvcc->current_packet[dtvcc->current_packet_length++] = data[3];
+					dtvcc->is_current_packet_header_parsed = 1;
+				}
+			}
+			break;
+		default:
+			fatal(CEA_COMMON_EXIT_BUG_BUG, "[CEA-708] dtvcc_process_data: "
+									      "shouldn't be here - cc_type: %d\n",
+						     cc_type);
+	}
+}
+
+//--------------------------------------------------------------------------------------
+
+dtvcc_ctx *dtvcc_init(struct cea_decoder_dtvcc_settings *opts)
+{
+	dbg_print(CEA_DMT_708, "[CEA-708] initializing dtvcc decoder\n");
+	dtvcc_ctx *ctx = (dtvcc_ctx *)malloc(sizeof(dtvcc_ctx));
+	if (!ctx)
+	{
+		fatal(EXIT_NOT_ENOUGH_MEMORY, "[CEA-708] dtvcc_init");
+		return NULL;
+	}
+
+	ctx->report = opts->report;
+	ctx->report->reset_count = 0;
+	ctx->is_active = 0;
+	ctx->report_enabled = 0;
+	ctx->no_rollup = opts->no_rollup;
+	ctx->active_services_count = opts->active_services_count;
+
+	memcpy(ctx->services_active, opts->services_enabled, CEA_DTVCC_MAX_SERVICES * sizeof(int));
+
+	dtvcc_clear_packet(ctx);
+
+	ctx->last_sequence = CEA_DTVCC_NO_LAST_SEQUENCE;
+
+	ctx->report_enabled = opts->print_file_reports;
+	ctx->timing = opts->timing;
+
+	dbg_print(CEA_DMT_708, "[CEA-708] initializing services\n");
+
+	for (int i = 0; i < CEA_DTVCC_MAX_SERVICES; i++)
+	{
+		if (!ctx->services_active[i])
+			continue;
+
+		dtvcc_service_decoder *decoder = &ctx->decoders[i];
+		decoder->cc_count = 0;
+		decoder->tv = (dtvcc_tv_screen *)malloc(sizeof(dtvcc_tv_screen));
+		if (!decoder->tv)
+			fatal(EXIT_NOT_ENOUGH_MEMORY, "dtvcc_init");
+		decoder->tv->service_number = i + 1;
+		decoder->tv->cc_count = 0;
+
+		for (int j = 0; j < CEA_DTVCC_MAX_WINDOWS; j++)
+			decoder->windows[j].memory_reserved = 0;
+
+		dtvcc_windows_reset(decoder);
+	}
+
+	return ctx;
+}
+
+void dtvcc_free(dtvcc_ctx **ctx_ptr)
+{
+	dbg_print(CEA_DMT_708, "[CEA-708] dtvcc_free: cleaning up\n");
+
+	dtvcc_ctx *ctx = *ctx_ptr;
+
+	for (int i = 0; i < CEA_DTVCC_MAX_SERVICES; i++)
+	{
+		if (!ctx->services_active[i])
+			continue;
+
+		dtvcc_service_decoder *decoder = &ctx->decoders[i];
+
+		for (int j = 0; j < CEA_DTVCC_MAX_WINDOWS; j++)
+			if (decoder->windows[j].memory_reserved)
+			{
+				for (int k = 0; k < CEA_DTVCC_MAX_ROWS; k++)
+					free(decoder->windows[j].rows[k]);
+				decoder->windows[j].memory_reserved = 0;
+			}
+
+		free(decoder->tv);
+	}
+	freep(ctx_ptr);
+}
