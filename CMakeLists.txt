@@ -24,10 +24,10 @@ target_include_directories(cea
     PUBLIC
         # For consumers: installed include path
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>  # generated version header
         $<INSTALL_INTERFACE:include>
     PRIVATE
         src/                               # private source headers
-        ${CMAKE_CURRENT_BINARY_DIR}/include/  # generated version header
 )
 
 # Define export macro for Windows DLLs

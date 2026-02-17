@@ -13,7 +13,7 @@
  *  1. Uses FFmpeg avformat to open a media file and read raw video packets
  *  2. Feeds compressed packets into libcea's built-in demuxer
  *  3. The library extracts cc_data, reorders B-frames, and decodes EIA-608/708
- *  4. Prints decoded captions to stdout
+ *  4. Delivers captions via a live callback as they appear and disappear
  *
  * Build: see libcea/demo/CMakeLists.txt
  * Usage: ./demo <input_file>
@@ -30,7 +30,7 @@
 #include "cea.h"
 
 /* ------------------------------------------------------------------ */
-/* Log callback for libcea internal messages                     */
+/* Log callback for libcea internal messages                           */
 /* ------------------------------------------------------------------ */
 static void log_callback(cea_log_level level, const char *msg, void *userdata)
 {
@@ -40,39 +40,43 @@ static void log_callback(cea_log_level level, const char *msg, void *userdata)
 }
 
 /* ------------------------------------------------------------------ */
-/* Print captions retrieved from libcea                              */
+/* Live caption callback                                               */
+/*                                                                     */
+/* cap->text != NULL  →  new/updated caption on screen.               */
+/*   start_ms: when it appeared; end_ms: 0 (not yet known).           */
+/*   → Show this text immediately.                                     */
+/*                                                                     */
+/* cap->text == NULL  →  caption cleared.                             */
+/*   end_ms: when it disappeared.                                      */
+/*   → Clear the display at end_ms.                                    */
 /* ------------------------------------------------------------------ */
-static void print_captions(cea_ctx *ctx)
+static void live_caption_cb(const cea_caption *cap, void *userdata)
 {
-	cea_caption captions[64];
-	int count = cea_get_captions(ctx, captions, 64);
+	(void)userdata;
 
-	for (int i = 0; i < count; i++) {
-		printf("[CC] field=%d row=%d mode=%s info=%s time=%lld-%lld ms\n",
-		       captions[i].field,
-		       captions[i].base_row,
-		       captions[i].mode,
-		       captions[i].info,
-		       (long long)captions[i].start_ms,
-		       (long long)captions[i].end_ms);
-
-		if (captions[i].text) {
-			const char *p = captions[i].text;
-			while (*p) {
-				const char *nl = strchr(p, '\n');
-				if (nl) {
-					printf("[CC]   %.*s\n", (int)(nl - p), p);
-					p = nl + 1;
-				} else {
-					printf("[CC]   %s\n", p);
-					break;
-				}
+	if (cap->text) {
+		/* Caption appearing */
+		printf("[SHOW] field=%d row=%d mode=%s info=%s start=%lld ms\n",
+		       cap->field, cap->base_row, cap->mode, cap->info,
+		       (long long)cap->start_ms);
+		const char *p = cap->text;
+		while (*p) {
+			const char *nl = strchr(p, '\n');
+			if (nl) {
+				printf("       %.*s\n", (int)(nl - p), p);
+				p = nl + 1;
+			} else {
+				printf("       %s\n", p);
+				break;
 			}
 		}
+	} else {
+		/* Caption disappearing */
+		printf("[CLEAR] field=%d end=%lld ms\n",
+		       cap->field, (long long)cap->end_ms);
 	}
 
-	if (count > 0)
-		fflush(stdout);
+	fflush(stdout);
 }
 
 /* ------------------------------------------------------------------ */
@@ -115,7 +119,7 @@ int main(int argc, char *argv[])
 	AVStream *vstream = fmt_ctx->streams[video_idx];
 	enum AVCodecID codec_id = vstream->codecpar->codec_id;
 
-	int is_h264 = (codec_id == AV_CODEC_ID_H264);
+	int is_h264  = (codec_id == AV_CODEC_ID_H264);
 	int is_mpeg2 = (codec_id == AV_CODEC_ID_MPEG2VIDEO);
 
 	if (!is_h264 && !is_mpeg2) {
@@ -158,6 +162,25 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	/*
+	 * Register the live callback.
+	 *
+	 * In live/streaming mode the callback fires from within
+	 * cea_feed_packet() rather than the caller having to poll
+	 * cea_get_captions() after every packet.  This ensures captions
+	 * are delivered at the earliest possible moment:
+	 *
+	 *   SHOW  events fire as soon as text appears on the virtual
+	 *         608/708 screen (start_ms known, end_ms still 0).
+	 *
+	 *   CLEAR events fire when the screen is replaced or erased
+	 *         (end_ms known).
+	 *
+	 * The player should display the text immediately on SHOW and
+	 * schedule a clear at end_ms on CLEAR.
+	 */
+	cea_set_caption_callback(ctx, live_caption_cb, NULL);
+
 	/* ---- Packet reading loop ---- */
 	AVPacket *pkt = av_packet_alloc();
 	if (!pkt) {
@@ -181,16 +204,15 @@ int main(int argc, char *argv[])
 				pts_ms = av_rescale_q(pkt->dts, tb, (AVRational){1, 1000});
 			}
 
+			/* Captions are delivered via live_caption_cb() */
 			cea_feed_packet(ctx, pkt->data, pkt->size, pts_ms);
-			print_captions(ctx);
 			total_packets++;
 		}
 		av_packet_unref(pkt);
 	}
 
-	/* Flush any remaining buffered captions */
+	/* Flush remaining buffered captions (fires final callbacks) */
 	cea_flush(ctx);
-	print_captions(ctx);
 
 	/* ---- Summary ---- */
 	printf("\n--- Summary ---\n");

@@ -198,6 +198,11 @@ struct cea_ctx
 	} *reorder_buf;
 	int reorder_count;
 	int reorder_cap;
+	/* Live / streaming callback (optional) */
+	cea_caption_callback live_cb;
+	void *live_cb_userdata;
+	/* last current_visible_start_ms we reported per 608 field (index 0=field1, 1=field2) */
+	int64_t live_screen_start_ms[2];
 };
 
 /* Free previously stored captions text */
@@ -314,6 +319,104 @@ static void free_sub_chain(struct cc_subtitle *head)
 	}
 	freep(&head->data);
 	memset(head, 0, sizeof(struct cc_subtitle));
+}
+
+void cea_set_caption_callback(cea_ctx *ctx, cea_caption_callback cb, void *userdata)
+{
+	if (!ctx)
+		return;
+	ctx->live_cb = cb;
+	ctx->live_cb_userdata = userdata;
+	ctx->live_screen_start_ms[0] = 0;
+	ctx->live_screen_start_ms[1] = 0;
+}
+
+/*
+ * fire_live_callbacks — called at the end of every cea_feed() and cea_flush().
+ *
+ * Phase 1: drain the completed sub-chains and emit "clear" events (end_ms known).
+ *          For CEA-708, also emit a preceding "show" event because there is no
+ *          Phase 2 equivalent for the 708 decoder.
+ *
+ * Phase 2: peek at each 608 decoder's current visible screen buffer.  If the
+ *          screen has content and current_visible_start_ms has changed since we
+ *          last reported it, emit a "show" event immediately (end_ms still 0).
+ */
+static void fire_live_callbacks(cea_ctx *ctx)
+{
+	if (!ctx->live_cb)
+		return;
+
+	/* ---- Phase 1: completed captions → end (and 708 start+end) events ---- */
+	collect_captions(ctx);
+
+	for (int i = 0; i < ctx->caption_count; i++) {
+		cea_caption *cap = &ctx->captions[i];
+
+		if (cap->field == 3) {
+			/* CEA-708: no Phase 2, so fire the "show" event here first */
+			cea_caption show = *cap;
+			show.end_ms = 0;
+			ctx->live_cb(&show, ctx->live_cb_userdata);
+		}
+
+		/* Fire the "clear" event */
+		cea_caption clr = *cap;
+		clr.text     = NULL;
+		clr.start_ms = 0;
+		ctx->live_cb(&clr, ctx->live_cb_userdata);
+
+		/* Reset live tracking for EIA-608 fields */
+		if (cap->field == 1 || cap->field == 2)
+			ctx->live_screen_start_ms[cap->field - 1] = 0;
+	}
+
+	/* Sub-chains consumed; free them so cea_get_captions() returns 0 */
+	if (ctx->caption_count > 0) {
+		free_sub_chain(&ctx->sub);
+		free_sub_chain(&ctx->sub_708);
+	}
+
+	/* ---- Phase 2: peek at current EIA-608 visible screen buffers ---- */
+	cea_decoder_608_context *ctx608[2] = {
+		(cea_decoder_608_context *)ctx->dec->context_cc608_field_1,
+		(cea_decoder_608_context *)ctx->dec->context_cc608_field_2,
+	};
+
+	for (int f = 0; f < 2; f++) {
+		cea_decoder_608_context *c = ctx608[f];
+		if (!c)
+			continue;
+
+		/* Resolve current visible screen buffer directly */
+		struct eia608_screen *vis = (c->visible_buffer == 1) ? &c->buffer1 : &c->buffer2;
+
+		if (vis->empty)
+			continue;
+
+		if (c->current_visible_start_ms == ctx->live_screen_start_ms[f])
+			continue; /* already reported this screen epoch */
+
+		int bottom_row = -1;
+		char *text = screen_608_to_styled_text(vis, &bottom_row);
+		if (!text)
+			continue;
+
+		cea_caption cap = {0};
+		cap.text      = text;
+		cap.start_ms  = c->current_visible_start_ms;
+		cap.end_ms    = 0;
+		cap.field     = f + 1;
+		cap.base_row  = bottom_row;
+		strncpy(cap.mode, mode_str(c->mode), 4);
+		cap.mode[4]   = '\0';
+		strncpy(cap.info, "608", 3);
+		cap.info[3]   = '\0';
+
+		ctx->live_cb(&cap, ctx->live_cb_userdata);
+		ctx->live_screen_start_ms[f] = c->current_visible_start_ms;
+		free(text);
+	}
 }
 
 cea_ctx *cea_init(const cea_options *opts)
@@ -448,7 +551,11 @@ int cea_feed(cea_ctx *ctx, const unsigned char *cc_data, int cc_count, int64_t p
 
 	/* Process cc_data -- 608 output goes to ctx->sub,
 	 * 708 output goes to ctx->sub_708 via dtvcc->current_sub */
-	return process_cc_data(ctx->dec, (unsigned char *)cc_data, cc_count, &ctx->sub);
+	int ret = process_cc_data(ctx->dec, (unsigned char *)cc_data, cc_count, &ctx->sub);
+
+	fire_live_callbacks(ctx);
+
+	return ret;
 }
 
 /* Sort the reorder buffer by PTS and feed all entries via cea_feed */
@@ -587,6 +694,10 @@ int cea_flush(cea_ctx *ctx)
 		ctx->dec->dtvcc->current_sub = &ctx->sub_708;
 
 	flush_cc_decode(ctx->dec, &ctx->sub);
+
+	/* Drain any captions produced by the flush (e.g. final EDM) */
+	fire_live_callbacks(ctx);
+
 	return 0;
 }
 
