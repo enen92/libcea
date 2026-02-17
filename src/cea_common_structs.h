@@ -11,12 +11,6 @@
 
 #include "cea_common_constants.h"
 
-struct cea_common_logging_t
-{
-	int64_t debug_mask;
-};
-extern struct cea_common_logging_t cea_common_logging;
-
 enum subtype
 {
 	CC_608,

@@ -142,13 +142,13 @@ int main(int argc, char *argv[])
 	}
 
 	/* ---- libcea setup ---- */
-	cea_set_log_callback(log_callback, NULL, CEA_LOG_INFO);
 	cea_ctx *ctx = cea_init_default();
 	if (!ctx) {
 		fprintf(stderr, "Error: failed to init libcea\n");
 		avformat_close_input(&fmt_ctx);
 		return 1;
 	}
+	cea_set_log_callback(ctx, log_callback, NULL, CEA_LOG_INFO);
 
 	/* Configure demuxer */
 	cea_codec_type codec = is_h264 ? CEA_CODEC_H264 : CEA_CODEC_MPEG2;

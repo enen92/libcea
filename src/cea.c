@@ -203,6 +203,11 @@ struct cea_ctx
 	void *live_cb_userdata;
 	/* last current_visible_start_ms we reported per 608 field (index 0=field1, 1=field2) */
 	int64_t live_screen_start_ms[2];
+	/* Logger */
+	cea_log_callback log_cb;
+	void            *log_ud;
+	cea_log_level    log_min_level;
+	int64_t          log_debug_mask;
 };
 
 /* Free previously stored captions text */
@@ -319,6 +324,16 @@ static void free_sub_chain(struct cc_subtitle *head)
 	}
 	freep(&head->data);
 	memset(head, 0, sizeof(struct cc_subtitle));
+}
+
+void cea_set_log_callback(cea_ctx *ctx, cea_log_callback cb, void *userdata, cea_log_level min_level)
+{
+	if (!ctx)
+		return;
+	ctx->log_cb        = cb;
+	ctx->log_ud        = userdata;
+	ctx->log_min_level = min_level;
+	cea_log_activate(cb, userdata, min_level, ctx->log_debug_mask);
 }
 
 void cea_set_caption_callback(cea_ctx *ctx, cea_caption_callback cb, void *userdata)
@@ -529,6 +544,8 @@ int cea_feed(cea_ctx *ctx, const unsigned char *cc_data, int cc_count, int64_t p
 	if (!ctx || !ctx->dec || !cc_data || cc_count <= 0)
 		return -1;
 
+	cea_log_activate(ctx->log_cb, ctx->log_ud, ctx->log_min_level, ctx->log_debug_mask);
+
 	/* Convert pts_ms to PTS ticks (90kHz clock) */
 	int64_t pts_ticks = (int64_t)pts_ms * 90;
 
@@ -686,6 +703,8 @@ int cea_flush(cea_ctx *ctx)
 {
 	if (!ctx || !ctx->dec)
 		return -1;
+
+	cea_log_activate(ctx->log_cb, ctx->log_ud, ctx->log_min_level, ctx->log_debug_mask);
 
 	/* Flush any pending reorder buffer entries */
 	flush_reorder_buffer(ctx);

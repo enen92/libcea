@@ -31,14 +31,14 @@ typedef enum {
 /* Log callback: receives level, formatted message, and user-supplied pointer */
 typedef void (*cea_log_callback)(cea_log_level level, const char *msg, void *userdata);
 
-/*
- * Register a global log callback. Messages below min_level are silently dropped.
- * Pass NULL as cb to disable logging (the default).
- */
-void cea_set_log_callback(cea_log_callback cb, void *userdata, cea_log_level min_level);
-
 /* Opaque context */
 typedef struct cea_ctx cea_ctx;
+
+/*
+ * Register a log callback on a context. Messages below min_level are silently dropped.
+ * Pass NULL as cb to disable logging (the default).
+ */
+void cea_set_log_callback(cea_ctx *ctx, cea_log_callback cb, void *userdata, cea_log_level min_level);
 
 /* Caption output */
 typedef struct {

@@ -37,9 +37,15 @@
 /* Single logging function -- all logging goes through here */
 void cea_log(cea_log_level level, const char *fmt, ...);
 
+/* Active debug mask (synced from context on each feed/flush entry) */
+extern int64_t cea_log_debug_mask;
+
+/* Activate the logger state for the current context */
+void cea_log_activate(cea_log_callback cb, void *ud, cea_log_level min_level, int64_t debug_mask);
+
 /* Convenience wrappers */
 #define mprint(...) cea_log(CEA_LOG_INFO, __VA_ARGS__)
-#define dbg_print(mask, ...) do { if (cea_common_logging.debug_mask & (mask)) cea_log(CEA_LOG_DEBUG, __VA_ARGS__); } while (0)
+#define dbg_print(mask, ...) do { if (cea_log_debug_mask & (mask)) cea_log(CEA_LOG_DEBUG, __VA_ARGS__); } while (0)
 #define fatal(code, ...) do { cea_log(CEA_LOG_FATAL, __VA_ARGS__); exit(code); } while (0)
 
 /* Declarations */

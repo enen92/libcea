@@ -17,11 +17,19 @@
 
 /* ---- Callback-based logging ---- */
 
-static cea_log_callback s_log_cb    = NULL;
-static void            *s_log_ud    = NULL;
-static cea_log_level    s_min_level = CEA_LOG_INFO;
+static cea_log_callback s_log_cb     = NULL;
+static void            *s_log_ud     = NULL;
+static cea_log_level    s_min_level  = CEA_LOG_INFO;
+int64_t                 cea_log_debug_mask = 0;
 
-struct cea_common_logging_t cea_common_logging = { .debug_mask = 0 };
+/* Activate the logger state for the current context (called at feed/flush entry). */
+void cea_log_activate(cea_log_callback cb, void *ud, cea_log_level min_level, int64_t debug_mask)
+{
+	s_log_cb         = cb;
+	s_log_ud         = ud;
+	s_min_level      = min_level;
+	cea_log_debug_mask = debug_mask;
+}
 
 void cea_log(cea_log_level level, const char *fmt, ...)
 {
@@ -33,13 +41,6 @@ void cea_log(cea_log_level level, const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 	s_log_cb(level, buf, s_log_ud);
-}
-
-void cea_set_log_callback(cea_log_callback cb, void *userdata, cea_log_level min_level)
-{
-	s_log_cb    = cb;
-	s_log_ud    = userdata;
-	s_min_level = min_level;
 }
 
 /* ---- Parity & utility ---- */
