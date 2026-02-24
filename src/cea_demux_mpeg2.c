@@ -70,7 +70,24 @@ static int parse_mpeg2_userdata_for_cc(const uint8_t *data, int data_len, uint8_
 cea_demux_result cea_demux_mpeg2_extract_cc(const uint8_t *data, int size,
                                             uint8_t *cc_out)
 {
+	/* Detect picture_coding_type from the picture_start_code (00 00 01 00).
+	 * MPEG-2 packets arrive in decode (DTS) order from the container.  B-frames
+	 * have a lower display PTS than the P-frame decoded before them, so a reorder
+	 * buffer is needed.  Signal reorder_window=2 when a B-frame is found; leave
+	 * the window at -1 (no update) for I/P frames so the caller keeps whatever
+	 * window it determined from earlier in the stream.
+	 */
 	cea_demux_result result = {0, -1};
+	for (int i = 0; i + 5 < size; i++) {
+		if (data[i] == 0x00 && data[i+1] == 0x00 &&
+		    data[i+2] == 0x01 && data[i+3] == 0x00) {
+			/* picture_coding_type is bits [5:3] of the byte at offset +5 */
+			int pct = (data[i+5] >> 3) & 0x07;
+			if (pct == 3) /* B-frame: needs reorder buffer */
+				result.reorder_window = 2;
+			break;
+		}
+	}
 	result.cc_count = parse_mpeg2_userdata_for_cc(data, size, cc_out);
 	return result;
 }
