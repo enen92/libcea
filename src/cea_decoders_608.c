@@ -119,6 +119,8 @@ void clear_eia608_cc_buffer(cea_decoder_608_context *context, struct eia608_scre
 		data->row_used[i] = 0;
 	}
 	data->empty = 1;
+	data->start_time = 0;
+	data->end_time = 0;
 }
 
 void cea_decoder_608_dinit_library(void **ctx)
