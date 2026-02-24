@@ -36,7 +36,6 @@ static const char *mode_str(enum cc_modes mode)
 		case MODE_ROLLUP_4:     return "RU4";
 		case MODE_TEXT:         return "TXT";
 		case MODE_PAINTON:      return "PAI";
-		case MODE_FAKE_ROLLUP_1: return "RU1";
 		default:                return "";
 	}
 }
@@ -469,7 +468,6 @@ cea_ctx *cea_init(const cea_options *opts)
 	settings_708.enabled = opts ? opts->enable_708 : 1;
 	settings_708.active_services_count = 0;
 	settings_708.print_file_reports = 0;
-	settings_708.no_rollup = opts ? opts->no_rollup : 0;
 
 	/* Enable 708 services */
 	if (opts && opts->enable_708)
@@ -493,7 +491,6 @@ cea_ctx *cea_init(const cea_options *opts)
 	dec_settings.settings_dtvcc = &settings_708;
 	dec_settings.cc_channel = opts ? opts->cc_channel : 1;
 	dec_settings.extract = 1; /* Extract field 1 by default */
-	dec_settings.no_rollup = opts ? opts->no_rollup : 0;
 
 	ctx->dec = init_cc_decode(&dec_settings);
 	if (!ctx->dec)
@@ -516,7 +513,6 @@ cea_ctx *cea_init_default(void)
 	opts.cc_channel = 1;
 	opts.enable_708 = 1;
 	opts.services_708[0] = 1; /* Enable service 1 */
-	opts.no_rollup = 0;
 	return cea_init(&opts);
 }
 

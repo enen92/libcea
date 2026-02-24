@@ -341,7 +341,6 @@ typedef struct cea_decoder_dtvcc_settings
 {
 	int enabled;
 	int print_file_reports;
-	int no_rollup;
 	cea_decoder_dtvcc_report *report;
 	int active_services_count;
 	int services_enabled[CEA_DTVCC_MAX_SERVICES];
@@ -372,7 +371,6 @@ typedef struct dtvcc_ctx
 	int last_sequence;
 
 	struct cc_subtitle *current_sub; // subtitle output destination (set per process_cc_data call)
-	int no_rollup;
 	struct cea_common_timing_ctx *timing;
 } dtvcc_ctx;
 

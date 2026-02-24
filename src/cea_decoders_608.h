@@ -26,8 +26,6 @@ struct cea_decoder_608_report
 typedef struct cea_decoder_608_settings
 {
 	int direct_rollup;			       // Write roll-up captions directly instead of line by line?
-	int force_rollup;			       // 0=Disabled, 1, 2 or 3=max lines in roll-up mode
-	int no_rollup;				       // If 1, write one line at a time
 	enum cea_decoder_608_color_code default_color; // Default color to use.
 	int screens_to_process;			       // How many screenfuls we want? Use -1 for unlimited
 	struct cea_decoder_608_report *report;
@@ -89,9 +87,6 @@ enum command_code
 	COM_ALARMON = 15,
 	COM_DELETETOENDOFROW = 16,
 	COM_RESUMEDIRECTCAPTIONING = 17,
-	// Non existing commands we insert to have the decoder
-	// special stuff for us.
-	COM_FAKE_RULLUP1 = 18
 };
 
 void cea_decoder_608_dinit_library(void **ctx);

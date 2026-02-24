@@ -32,8 +32,6 @@ enum cc_modes
 	MODE_ROLLUP_4 = 3,
 	MODE_TEXT = 4,
 	MODE_PAINTON = 5,
-	// Fake modes to emulate stuff
-	MODE_FAKE_ROLLUP_1 = 100
 };
 
 enum font_bits
@@ -82,7 +80,6 @@ struct eia608_screen // A CC buffer
 struct cea_decoders_common_settings_t
 {
 	int extract; // Extract 1st, 2nd or both fields
-	int no_rollup;
 	struct cea_decoder_608_settings *settings_608; // Contains the settings for the 608 decoder.
 	cea_decoder_dtvcc_settings *settings_dtvcc;    // Same for cea 708 captions decoder (dtvcc)
 	int cc_channel;				       // Channel we want to dump in srt mode
@@ -98,7 +95,6 @@ struct lib_cc_decode
 	void *context_cc608_field_1;
 	void *context_cc608_field_2;
 
-	int no_rollup; // If 1, write one line at a time
 	int extract;   // Extract 1st, 2nd or both fields
 
 	struct cea_common_timing_ctx *timing;

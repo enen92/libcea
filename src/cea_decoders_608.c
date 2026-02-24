@@ -186,7 +186,6 @@ struct eia608_screen *get_writing_buffer(cea_decoder_608_context *context)
 			else
 				use_buffer = &context->buffer1;
 			break;
-		case MODE_FAKE_ROLLUP_1: // Write directly to screen
 		case MODE_ROLLUP_2:
 		case MODE_ROLLUP_3:
 		case MODE_ROLLUP_4:
@@ -313,10 +312,6 @@ int write_cc_buffer(cea_decoder_608_context *context, struct cc_subtitle *sub)
 	}
 
 	data = get_current_visible_buffer(context);
-
-	if (context->mode == MODE_FAKE_ROLLUP_1 && // Use the actual start of data instead of last buffer change
-	    context->ts_start_of_current_line != -1)
-		context->current_visible_start_ms = context->ts_start_of_current_line;
 
 	start_time = context->current_visible_start_ms;
 	end_time = get_visible_end(context->timing, context->my_field);
@@ -487,9 +482,6 @@ int check_roll_up(cea_decoder_608_context *context)
 
 	switch (context->mode)
 	{
-		case MODE_FAKE_ROLLUP_1:
-			keep_lines = 1;
-			break;
 		case MODE_ROLLUP_2:
 			keep_lines = 2;
 			break;
@@ -541,9 +533,6 @@ int roll_up(cea_decoder_608_context *context)
 	int keep_lines;
 	switch (context->mode)
 	{
-		case MODE_FAKE_ROLLUP_1:
-			keep_lines = 1;
-			break;
 		case MODE_ROLLUP_2:
 			keep_lines = 2;
 			break;
@@ -719,14 +708,6 @@ void handle_command(unsigned char c1, const unsigned char c2, cea_decoder_608_co
 	if ((c1 == 0x14 || c1 == 0x1C) && c2 == 0x2b)
 		command = COM_RESUMETEXTDISPLAY;
 
-	if ((command == COM_ROLLUP2 || command == COM_ROLLUP3 || command == COM_ROLLUP4) && context->settings->force_rollup == 1)
-		command = COM_FAKE_RULLUP1;
-
-	if ((command == COM_ROLLUP3 || command == COM_ROLLUP4) && context->settings->force_rollup == 2)
-		command = COM_ROLLUP2;
-	else if (command == COM_ROLLUP4 && context->settings->force_rollup == 3)
-		command = COM_ROLLUP3;
-
 	dbg_print(CEA_DMT_DECODER_608, "\rCommand begin: %02X %02X (%s)\n", c1, c2, command_type[command]);
 	dbg_print(CEA_DMT_DECODER_608, "\rCurrent mode: %d  Position: %d,%d  VisBuf: %d\n", context->mode,
 				     context->cursor_row, context->cursor_column, context->visible_buffer);
@@ -760,7 +741,6 @@ void handle_command(unsigned char c1, const unsigned char c2, cea_decoder_608_co
 		case COM_RESUMETEXTDISPLAY:
 			context->mode = MODE_TEXT;
 			break;
-		case COM_FAKE_RULLUP1:
 		case COM_ROLLUP2:
 		case COM_ROLLUP3:
 		case COM_ROLLUP4:
@@ -792,9 +772,6 @@ void handle_command(unsigned char c1, const unsigned char c2, cea_decoder_608_co
 
 			switch (command)
 			{
-				case COM_FAKE_RULLUP1:
-					context->mode = MODE_FAKE_ROLLUP_1;
-					break;
 				case COM_ROLLUP2:
 					context->mode = MODE_ROLLUP_2;
 					break;
@@ -838,8 +815,6 @@ void handle_command(unsigned char c1, const unsigned char c2, cea_decoder_608_co
 				{
 					if (write_cc_buffer(context, sub))
 						context->screenfuls_counter++;
-					if (context->settings->no_rollup)
-						erase_memory(context, true); // Make sure the lines we just wrote aren't written again
 				}
 			}
 			roll_up(context); // The roll must be done anyway of course.
@@ -1012,7 +987,7 @@ void handle_pac(unsigned char c1, unsigned char c2, cea_decoder_608_context *con
 	context->rollup_base_row = row - 1;
 	context->cursor_column = indent;
 	context->have_cursor_position = 1;
-	if (context->mode == MODE_FAKE_ROLLUP_1 || context->mode == MODE_ROLLUP_2 ||
+	if (context->mode == MODE_ROLLUP_2 ||
 	    context->mode == MODE_ROLLUP_3 || context->mode == MODE_ROLLUP_4)
 	{
 		/* In roll-up, delete lines BELOW the PAC. Not sure (CFS) this is correct (possibly we may have to move the
@@ -1277,8 +1252,7 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 			}
 
 			if (wrote_to_screen && context->settings->direct_rollup && // If direct_rollup is enabled and
-			    (context->mode == MODE_FAKE_ROLLUP_1 ||		   // we are in rollup mode, write now.
-			     context->mode == MODE_ROLLUP_2 ||
+			    (context->mode == MODE_ROLLUP_2 ||
 			     context->mode == MODE_ROLLUP_3 ||
 			     context->mode == MODE_ROLLUP_4))
 			{

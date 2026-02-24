@@ -56,7 +56,6 @@ typedef struct {
 	int cc_channel;         /* 608 channel: 1=CC1 (default), 2=CC2 */
 	int enable_708;         /* Enable CEA-708 decoding (default: 1) */
 	int services_708[63];   /* Which 708 services to enable (1-indexed, 0=disabled) */
-	int no_rollup;          /* If 1, write one line at a time */
 	int reorder_window;     /* B-frame reorder window for cea_feed_packet().
 	                         * 0 = auto-detect from stream (default).
 	                         * >0 = override with this value.

@@ -172,10 +172,6 @@ struct lib_cc_decode *init_cc_decode(struct cea_decoders_common_settings_t *sett
 
 	setting->settings_dtvcc->timing = ctx->timing;
 
-	setting->settings_608->no_rollup = setting->no_rollup;
-	setting->settings_dtvcc->no_rollup = setting->no_rollup;
-	ctx->no_rollup = setting->no_rollup;
-
 	/* Always use C dtvcc */
 	ctx->dtvcc = dtvcc_init(setting->settings_dtvcc);
 	if (!ctx->dtvcc)

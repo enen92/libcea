@@ -102,7 +102,6 @@ dtvcc_ctx *dtvcc_init(struct cea_decoder_dtvcc_settings *opts)
 	ctx->report->reset_count = 0;
 	ctx->is_active = 0;
 	ctx->report_enabled = 0;
-	ctx->no_rollup = opts->no_rollup;
 	ctx->active_services_count = opts->active_services_count;
 
 	memcpy(ctx->services_active, opts->services_enabled, CEA_DTVCC_MAX_SERVICES * sizeof(int));
