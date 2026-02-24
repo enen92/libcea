@@ -178,9 +178,12 @@ int dtvcc_screen_to_subtitle(dtvcc_tv_screen *tv, struct cc_subtitle *sub)
 
 	buf[buf_len] = '\0';
 
-	/* Use add_cc_sub_text to add to the subtitle chain */
+	/* Encode service number into info: "7XX" (e.g. "701" = service 1).
+	 * collect_captions decodes this back into cea_caption.channel. */
+	char info_str[4];
+	snprintf(info_str, sizeof(info_str), "7%02d", tv->service_number);
 	int ret = add_cc_sub_text(sub, buf, tv->time_ms_show, tv->time_ms_hide,
-				  "708", "POP");
+				  info_str, "POP");
 
 	/* Store bottom row on the node that add_cc_sub_text just wrote.
 	 * It's always the tail of the chain. */

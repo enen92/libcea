@@ -200,8 +200,9 @@ struct cea_ctx
 	/* Live / streaming callback (optional) */
 	cea_caption_callback live_cb;
 	void *live_cb_userdata;
-	/* last current_visible_start_ms we reported per 608 field (index 0=field1, 1=field2) */
-	int64_t live_screen_start_ms[2];
+	/* last current_visible_start_ms we reported per CC channel
+	 * index 0=CC1, 1=CC2, 2=CC3, 3=CC4 */
+	int64_t live_screen_start_ms[4];
 	/* Logger */
 	cea_log_callback log_cb;
 	void            *log_ud;
@@ -268,15 +269,18 @@ static void collect_captions(cea_ctx *ctx)
 				ctx->captions[idx].text = ctx->text_storage[idx];
 				ctx->captions[idx].start_ms = s->start_time;
 				ctx->captions[idx].end_ms = s->end_time;
-				/* Determine field from info */
+				/* info is "7XX" where XX is the service number (01-63) */
 				if (s->info[0] == '7')
+				{
 					ctx->captions[idx].field = 3;
+					ctx->captions[idx].channel = atoi(s->info + 1);
+				}
 				else
 					ctx->captions[idx].field = 1;
 				ctx->captions[idx].base_row = s->flags; /* set by 708 output */
 				strncpy(ctx->captions[idx].mode, s->mode, 4);
 				ctx->captions[idx].mode[4] = '\0';
-				strncpy(ctx->captions[idx].info, s->info, 3);
+				strncpy(ctx->captions[idx].info, "708", 3);
 				ctx->captions[idx].info[3] = '\0';
 				idx++;
 			}
@@ -295,6 +299,7 @@ static void collect_captions(cea_ctx *ctx)
 					ctx->captions[idx].start_ms = screen->start_time;
 					ctx->captions[idx].end_ms = screen->end_time;
 					ctx->captions[idx].field = screen->my_field;
+					ctx->captions[idx].channel = screen->my_channel;
 					ctx->captions[idx].base_row = bottom_row;
 					strncpy(ctx->captions[idx].mode, mode_str(screen->mode), 4);
 					ctx->captions[idx].mode[4] = '\0';
@@ -341,8 +346,7 @@ void cea_set_caption_callback(cea_ctx *ctx, cea_caption_callback cb, void *userd
 		return;
 	ctx->live_cb = cb;
 	ctx->live_cb_userdata = userdata;
-	ctx->live_screen_start_ms[0] = 0;
-	ctx->live_screen_start_ms[1] = 0;
+	memset(ctx->live_screen_start_ms, 0, sizeof(ctx->live_screen_start_ms));
 }
 
 /*
@@ -380,9 +384,9 @@ static void fire_live_callbacks(cea_ctx *ctx)
 		clr.start_ms = 0;
 		ctx->live_cb(&clr, ctx->live_cb_userdata);
 
-		/* Reset live tracking for EIA-608 fields */
-		if (cap->field == 1 || cap->field == 2)
-			ctx->live_screen_start_ms[cap->field - 1] = 0;
+		/* Reset live tracking for EIA-608 CC channels */
+		if ((cap->field == 1 || cap->field == 2) && (cap->channel == 1 || cap->channel == 2))
+			ctx->live_screen_start_ms[(cap->field - 1) * 2 + (cap->channel - 1)] = 0;
 	}
 
 	/* Sub-chains consumed; free them so cea_get_captions() returns 0 */
@@ -391,25 +395,27 @@ static void fire_live_callbacks(cea_ctx *ctx)
 		free_sub_chain(&ctx->sub_708);
 	}
 
-	/* ---- Phase 2: peek at current EIA-608 visible screen buffers ---- */
-	cea_decoder_608_context *ctx608[2] = {
-		(cea_decoder_608_context *)ctx->dec->context_cc608_field_1,
-		(cea_decoder_608_context *)ctx->dec->context_cc608_field_2,
+	/* ---- Phase 2: peek at current EIA-608 visible screen buffers ----
+	 * Order: CC1 (f1/ch1), CC2 (f1/ch2), CC3 (f2/ch1), CC4 (f2/ch2) */
+	cea_decoder_608_context *ctx608[4] = {
+		(cea_decoder_608_context *)ctx->dec->context_cc608_field_1_ch1,
+		(cea_decoder_608_context *)ctx->dec->context_cc608_field_1_ch2,
+		(cea_decoder_608_context *)ctx->dec->context_cc608_field_2_ch1,
+		(cea_decoder_608_context *)ctx->dec->context_cc608_field_2_ch2,
 	};
 
-	for (int f = 0; f < 2; f++) {
+	for (int f = 0; f < 4; f++) {
 		cea_decoder_608_context *c = ctx608[f];
 		if (!c)
 			continue;
 
-		/* Resolve current visible screen buffer directly */
 		struct eia608_screen *vis = (c->visible_buffer == 1) ? &c->buffer1 : &c->buffer2;
 
 		if (vis->empty)
 			continue;
 
 		if (c->current_visible_start_ms == ctx->live_screen_start_ms[f])
-			continue; /* already reported this screen epoch */
+			continue;
 
 		int bottom_row = -1;
 		char *text = screen_608_to_styled_text(vis, &bottom_row);
@@ -420,7 +426,8 @@ static void fire_live_callbacks(cea_ctx *ctx)
 		cap.text      = text;
 		cap.start_ms  = c->current_visible_start_ms;
 		cap.end_ms    = 0;
-		cap.field     = f + 1;
+		cap.field     = (f < 2) ? 1 : 2;
+		cap.channel   = (f % 2) + 1;
 		cap.base_row  = bottom_row;
 		strncpy(cap.mode, mode_str(c->mode), 4);
 		cap.mode[4]   = '\0';
@@ -489,8 +496,7 @@ cea_ctx *cea_init(const cea_options *opts)
 	struct cea_decoders_common_settings_t dec_settings = {0};
 	dec_settings.settings_608 = &settings_608;
 	dec_settings.settings_dtvcc = &settings_708;
-	dec_settings.cc_channel = opts ? opts->cc_channel : 1;
-	dec_settings.extract = 1; /* Extract field 1 by default */
+	dec_settings.extract = 12; /* Always extract both EIA-608 fields and all channels */
 
 	ctx->dec = init_cc_decode(&dec_settings);
 	if (!ctx->dec)
@@ -510,7 +516,6 @@ cea_ctx *cea_init(const cea_options *opts)
 cea_ctx *cea_init_default(void)
 {
 	cea_options opts = {0};
-	opts.cc_channel = 1;
 	opts.enable_708 = 1;
 	opts.services_708[0] = 1; /* Enable service 1 */
 	return cea_init(&opts);

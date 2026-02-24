@@ -15,11 +15,17 @@ void printdata(struct lib_cc_decode *ctx, const unsigned char *data1, int length
 	if (length1 && ctx->extract != 2)
 	{
 		ctx->current_field = 1;
+		ctx->current_channel = 1;
+		ctx->writedata(data1, length1, ctx, sub);
+		ctx->current_channel = 2;
 		ctx->writedata(data1, length1, ctx, sub);
 	}
 	if (length2 && ctx->extract != 1)
 	{
 		ctx->current_field = 2;
+		ctx->current_channel = 1;
+		ctx->writedata(data2, length2, ctx, sub);
+		ctx->current_channel = 2;
 		ctx->writedata(data2, length2, ctx, sub);
 	}
 }

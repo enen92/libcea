@@ -56,8 +56,8 @@ static void live_caption_cb(const cea_caption *cap, void *userdata)
 
 	if (cap->text) {
 		/* Caption appearing */
-		printf("[SHOW] field=%d row=%d mode=%s info=%s start=%lld ms\n",
-		       cap->field, cap->base_row, cap->mode, cap->info,
+		printf("[SHOW] field=%d channel=%d row=%d mode=%s info=%s start=%lld ms\n",
+		       cap->field, cap->channel, cap->base_row, cap->mode, cap->info,
 		       (long long)cap->start_ms);
 		const char *p = cap->text;
 		while (*p) {

@@ -45,7 +45,13 @@ typedef struct {
 	const char *text;   /* UTF-8 caption text (one line per row, \n separated) */
 	int64_t start_ms;   /* Start time in milliseconds */
 	int64_t end_ms;     /* End time in milliseconds */
-	int field;          /* 1=CC1, 2=CC2, 3=CEA-708 */
+	int field;          /* EIA-608: 1=field 1, 2=field 2.  CEA-708: 3. */
+	int channel;        /* EIA-608: channel within field (1 or 2).
+	                     *   field=1, channel=1 → CC1
+	                     *   field=1, channel=2 → CC2
+	                     *   field=2, channel=1 → CC3
+	                     *   field=2, channel=2 → CC4
+	                     * CEA-708: service number (1-based). */
 	int base_row;       /* Bottom-most screen row with content (0-14 for 608, -1 if unknown) */
 	char mode[5];       /* Caption mode: "POP", "RU2", "RU3", "RU4", "PAI", "TXT" */
 	char info[4];       /* Decoder info: "608" or "708" */
@@ -53,7 +59,6 @@ typedef struct {
 
 /* Options for initialization */
 typedef struct {
-	int cc_channel;         /* 608 channel: 1=CC1 (default), 2=CC2 */
 	int enable_708;         /* Enable CEA-708 decoding (default: 1) */
 	int services_708[63];   /* Which 708 services to enable (1-indexed, 0=disabled) */
 	int reorder_window;     /* B-frame reorder window for cea_feed_packet().

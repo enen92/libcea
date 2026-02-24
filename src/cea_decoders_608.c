@@ -322,6 +322,7 @@ int write_cc_buffer(cea_decoder_608_context *context, struct cc_subtitle *sub)
 	data->mode = context->mode;
 	data->channel = context->channel;
 	data->my_field = context->my_field;
+	data->my_channel = context->my_channel;
 
 	if (!data->empty)
 	{
@@ -403,6 +404,7 @@ int write_cc_line(cea_decoder_608_context *context, struct cc_subtitle *sub)
 	data->mode = context->mode;
 	data->channel = context->channel;
 	data->my_field = context->my_field;
+	data->my_channel = context->my_channel;
 
 	if (!data->empty)
 	{
@@ -1134,22 +1136,16 @@ int process608(const unsigned char *data, int length, void *private_data, struct
 	struct cea_decoder_608_context *context;
 	int i;
 
-	if (dec_ctx->current_field == 1 && (dec_ctx->extract == 1 || dec_ctx->extract == 12))
-	{
-		context = dec_ctx->context_cc608_field_1;
-	}
-	else if (dec_ctx->current_field == 2 && (dec_ctx->extract == 2 || dec_ctx->extract == 12))
-	{
-		context = dec_ctx->context_cc608_field_2;
-	}
-	else if (dec_ctx->current_field == 2 && dec_ctx->extract == 1)
-	{
-		context = NULL;
-	}
+	if (dec_ctx->current_field == 1 && dec_ctx->current_channel == 1)
+		context = dec_ctx->context_cc608_field_1_ch1;
+	else if (dec_ctx->current_field == 1 && dec_ctx->current_channel == 2)
+		context = dec_ctx->context_cc608_field_1_ch2;
+	else if (dec_ctx->current_field == 2 && dec_ctx->current_channel == 1)
+		context = dec_ctx->context_cc608_field_2_ch1;
+	else if (dec_ctx->current_field == 2 && dec_ctx->current_channel == 2)
+		context = dec_ctx->context_cc608_field_2_ch2;
 	else
-	{
 		return -1;
-	}
 	if (context)
 	{
 		report = context->report;

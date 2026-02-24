@@ -150,8 +150,10 @@ void dinit_cc_decode(struct lib_cc_decode **ctx)
 {
 	struct lib_cc_decode *lctx = *ctx;
 	dtvcc_free(&lctx->dtvcc);
-	cea_decoder_608_dinit_library(&lctx->context_cc608_field_1);
-	cea_decoder_608_dinit_library(&lctx->context_cc608_field_2);
+	cea_decoder_608_dinit_library(&lctx->context_cc608_field_1_ch1);
+	cea_decoder_608_dinit_library(&lctx->context_cc608_field_1_ch2);
+	cea_decoder_608_dinit_library(&lctx->context_cc608_field_2_ch1);
+	cea_decoder_608_dinit_library(&lctx->context_cc608_field_2_ch2);
 	dinit_timing_ctx(&lctx->timing);
 	freep(ctx);
 }
@@ -178,26 +180,32 @@ struct lib_cc_decode *init_cc_decode(struct cea_decoders_common_settings_t *sett
 		fatal(EXIT_NOT_ENOUGH_MEMORY, "In init_cc_decode: Out of memory initializing dtvcc.");
 	ctx->dtvcc->is_active = setting->settings_dtvcc->enabled;
 
-	ctx->context_cc608_field_1 = cea_decoder_608_init_library(
-		setting->settings_608,
-		setting->cc_channel,
-		1,
-		&ctx->processed_enough,
-		0, /* cc_to_stdout */
-		ctx->timing);
-	if (!ctx->context_cc608_field_1)
-		fatal(EXIT_NOT_ENOUGH_MEMORY, "In init_cc_decode: Out of memory initializing context_cc608_field_1.");
-	ctx->context_cc608_field_2 = cea_decoder_608_init_library(
-		setting->settings_608,
-		setting->cc_channel,
-		2,
-		&ctx->processed_enough,
-		0, /* cc_to_stdout */
-		ctx->timing);
-	if (!ctx->context_cc608_field_2)
-		fatal(EXIT_NOT_ENOUGH_MEMORY, "In init_cc_decode: Out of memory initializing context_cc608_field_2.");
+	ctx->context_cc608_field_1_ch1 = cea_decoder_608_init_library(
+		setting->settings_608, 1, 1,
+		&ctx->processed_enough, 0, ctx->timing);
+	if (!ctx->context_cc608_field_1_ch1)
+		fatal(EXIT_NOT_ENOUGH_MEMORY, "In init_cc_decode: Out of memory initializing CC1 context.");
+
+	ctx->context_cc608_field_1_ch2 = cea_decoder_608_init_library(
+		setting->settings_608, 2, 1,
+		&ctx->processed_enough, 0, ctx->timing);
+	if (!ctx->context_cc608_field_1_ch2)
+		fatal(EXIT_NOT_ENOUGH_MEMORY, "In init_cc_decode: Out of memory initializing CC2 context.");
+
+	ctx->context_cc608_field_2_ch1 = cea_decoder_608_init_library(
+		setting->settings_608, 1, 2,
+		&ctx->processed_enough, 0, ctx->timing);
+	if (!ctx->context_cc608_field_2_ch1)
+		fatal(EXIT_NOT_ENOUGH_MEMORY, "In init_cc_decode: Out of memory initializing CC3 context.");
+
+	ctx->context_cc608_field_2_ch2 = cea_decoder_608_init_library(
+		setting->settings_608, 2, 2,
+		&ctx->processed_enough, 0, ctx->timing);
+	if (!ctx->context_cc608_field_2_ch2)
+		fatal(EXIT_NOT_ENOUGH_MEMORY, "In init_cc_decode: Out of memory initializing CC4 context.");
 
 	ctx->current_field = 1;
+	ctx->current_channel = 1;
 	ctx->extract = setting->extract;
 
 	/* Always use process608 for writedata in lite */
@@ -210,11 +218,13 @@ void flush_cc_decode(struct lib_cc_decode *ctx, struct cc_subtitle *sub)
 {
 	if (ctx->extract != 2)
 	{
-		flush_608_context(ctx->context_cc608_field_1, sub);
+		flush_608_context(ctx->context_cc608_field_1_ch1, sub);
+		flush_608_context(ctx->context_cc608_field_1_ch2, sub);
 	}
 	if (ctx->extract != 1)
 	{
-		flush_608_context(ctx->context_cc608_field_2, sub);
+		flush_608_context(ctx->context_cc608_field_2_ch1, sub);
+		flush_608_context(ctx->context_cc608_field_2_ch2, sub);
 	}
 
 	if (ctx->dtvcc && ctx->dtvcc->is_active)

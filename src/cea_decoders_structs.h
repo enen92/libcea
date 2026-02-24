@@ -73,8 +73,9 @@ struct eia608_screen // A CC buffer
 	/** end time of this CC buffer */
 	int64_t end_time;
 	enum cc_modes mode;
-	int channel;  // Currently selected channel
-	int my_field; // Used for sanity checks
+	int channel;    // Currently selected channel
+	int my_field;   // EIA-608 field number (1 or 2)
+	int my_channel; // EIA-608 channel within the field (1 or 2)
 };
 
 struct cea_decoders_common_settings_t
@@ -82,7 +83,6 @@ struct cea_decoders_common_settings_t
 	int extract; // Extract 1st, 2nd or both fields
 	struct cea_decoder_608_settings *settings_608; // Contains the settings for the 608 decoder.
 	cea_decoder_dtvcc_settings *settings_dtvcc;    // Same for cea 708 captions decoder (dtvcc)
-	int cc_channel;				       // Channel we want to dump in srt mode
 };
 
 struct lib_cc_decode
@@ -90,16 +90,23 @@ struct lib_cc_decode
 	int cc_stats[4];
 	int processed_enough; // If 1, we have enough lines, time, etc.
 
-	/* 608 contexts - note that this shouldn't be global, they should be
-	per program */
-	void *context_cc608_field_1;
-	void *context_cc608_field_2;
+	/* Four EIA-608 decoder contexts, one per CC channel:
+	 *   field_1_ch1 = CC1 (field 1, channel 1)
+	 *   field_1_ch2 = CC2 (field 1, channel 2)
+	 *   field_2_ch1 = CC3 (field 2, channel 1)
+	 *   field_2_ch2 = CC4 (field 2, channel 2)
+	 */
+	void *context_cc608_field_1_ch1;
+	void *context_cc608_field_1_ch2;
+	void *context_cc608_field_2_ch1;
+	void *context_cc608_field_2_ch2;
 
-	int extract;   // Extract 1st, 2nd or both fields
+	int extract;          // Extract 1st, 2nd or both fields
+	int current_field;    // 1 or 2, set by printdata before calling writedata
+	int current_channel;  // 1 or 2, set by printdata before calling writedata
 
 	struct cea_common_timing_ctx *timing;
 	dtvcc_ctx *dtvcc;
-	int current_field;
 	int (*writedata)(const unsigned char *data, int length, void *private_data, struct cc_subtitle *sub);
 };
 
