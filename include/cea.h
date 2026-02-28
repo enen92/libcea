@@ -40,6 +40,27 @@ typedef struct cea_ctx cea_ctx;
  */
 void cea_set_log_callback(cea_ctx *ctx, cea_log_callback cb, void *userdata, cea_log_level min_level);
 
+/*
+ * Debug mask bits for use with cea_set_debug_mask().
+ * These control which internal subsystems emit CEA_LOG_DEBUG messages.
+ * Multiple bits can be OR-ed together.
+ */
+typedef enum {
+	CEA_DBG_VERBOSE         = 0x08,  /* General verbose output */
+	CEA_DBG_DECODER_608     = 0x10,  /* EIA-608 decoder internals (MRC, PAC, commands) */
+	CEA_DBG_DECODER_708     = 0x20,  /* CEA-708 decoder internals */
+	CEA_DBG_RAW_BLOCKS      = 0x80,  /* Raw cc_data triplets */
+	CEA_DBG_GENERIC_NOTICES = 0x100, /* Generic decoder notices */
+} cea_debug_mask;
+
+/*
+ * Enable debug logging for specific subsystems.
+ * mask: bitwise OR of cea_debug_mask values.
+ * Also sets min_level to CEA_LOG_DEBUG automatically so debug messages
+ * are not filtered out. Call after cea_set_log_callback().
+ */
+void cea_set_debug_mask(cea_ctx *ctx, int64_t mask);
+
 /* Caption output */
 typedef struct {
 	const char *text;   /* UTF-8 caption text (one line per row, \n separated) */

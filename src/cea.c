@@ -340,6 +340,15 @@ void cea_set_log_callback(cea_ctx *ctx, cea_log_callback cb, void *userdata, cea
 	cea_log_activate(cb, userdata, min_level, ctx->log_debug_mask);
 }
 
+void cea_set_debug_mask(cea_ctx *ctx, int64_t mask)
+{
+	if (!ctx)
+		return;
+	ctx->log_debug_mask = mask;
+	ctx->log_min_level  = CEA_LOG_DEBUG;
+	cea_log_activate(ctx->log_cb, ctx->log_ud, CEA_LOG_DEBUG, mask);
+}
+
 void cea_set_caption_callback(cea_ctx *ctx, cea_caption_callback cb, void *userdata)
 {
 	if (!ctx)
