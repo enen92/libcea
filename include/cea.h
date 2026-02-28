@@ -64,8 +64,13 @@ void cea_set_debug_mask(cea_ctx *ctx, int64_t mask);
 /* Caption output */
 typedef struct {
 	const char *text;   /* UTF-8 caption text (one line per row, \n separated) */
-	int64_t start_ms;   /* Start time in milliseconds */
-	int64_t end_ms;     /* End time in milliseconds */
+	int64_t pts_ms;     /* Absolute PTS in milliseconds, in the same timeline as the
+	                     * pts_ms values passed to cea_feed() / cea_feed_packet().
+	                     * For SHOW events (text != NULL): the moment the caption appeared.
+	                     * For CLEAR events (text == NULL): the moment it disappeared.
+	                     * This is the primary timestamp for live/streaming callbacks. */
+	int64_t start_ms;   /* Start time in milliseconds (library-internal timeline) */
+	int64_t end_ms;     /* End time in milliseconds (library-internal timeline) */
 	int field;          /* EIA-608: 1=field 1, 2=field 2.  CEA-708: 3. */
 	int channel;        /* EIA-608: channel within field (1 or 2).
 	                     *   field=1, channel=1 → CC1
@@ -160,14 +165,14 @@ int cea_get_captions(cea_ctx *ctx, cea_caption *out, int max_captions);
  * disappear on screen.  The callback is invoked in two flavours:
  *
  *   cap->text != NULL  — a caption has appeared (or changed).
- *                        cap->start_ms: when it appeared on screen.
- *                        cap->end_ms:   0 (end time not yet known).
+ *                        cap->pts_ms: when it appeared (absolute, matches feed PTS).
+ *                        cap->end_ms: 0 (end time not yet known).
  *                        → Show this text immediately.
  *
  *   cap->text == NULL  — the previous caption has ended.
- *                        cap->end_ms: when it disappeared.
+ *                        cap->pts_ms: when it disappeared (absolute, matches feed PTS).
  *                        cap->start_ms: 0.
- *                        → Clear the display at end_ms.
+ *                        → Clear the display at pts_ms.
  *
  * cap->text is only valid for the duration of the callback.
  *

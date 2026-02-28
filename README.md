@@ -71,11 +71,11 @@ Register a callback to receive captions as they appear and disappear, without po
 void on_caption(const cea_caption *cap, void *userdata)
 {
     if (cap->text) {
-        /* Caption appeared: show it now, end time not yet known */
-        display_caption(cap->text, cap->start_ms);
+        /* Caption appeared: pts_ms is when it appeared on screen */
+        display_caption(cap->text, cap->pts_ms);
     } else {
-        /* Caption cleared: hide it at cap->end_ms */
-        schedule_clear(cap->end_ms);
+        /* Caption cleared: pts_ms is when it disappeared */
+        schedule_clear(cap->pts_ms);
     }
 }
 
@@ -93,14 +93,19 @@ cea_free(ctx);
 
 The callback fires from within `cea_feed_packet` and `cea_flush`. `cap->text` is only valid for the duration of the callback — copy it if you need it beyond that.
 
-#### Timing and discontinuities in live mode
+#### Timing in live mode
 
-`start_ms` is set when the caption first appears on screen; `end_ms` is `0` in the SHOW event and filled in only on the matching CLEAR event. Players should display the caption immediately on SHOW and schedule removal on CLEAR.
+`cap->pts_ms` is the primary timestamp for live callbacks. It is in the same millisecond timeline as the `pts_ms` values you pass to `cea_feed_packet` / `cea_feed`:
+
+- **SHOW** (`cap->text != NULL`): `pts_ms` is when the caption appeared on screen.
+- **CLEAR** (`cap->text == NULL`): `pts_ms` is when it disappeared.
+
+`start_ms` and `end_ms` are also present in the struct but reflect the library's internal relative timeline; prefer `pts_ms` in live mode.
 
 A few edge cases to handle:
 
 - **No CLEAR arrives** (e.g. stream ends mid-caption): call `cea_flush()` at end of stream. It will fire any pending CLEAR callbacks. If the stream is cut abruptly without a flush, the player should remove any pending caption after a reasonable display timeout.
-- **PTS discontinuities** (seek, channel change, splice): `start_ms` values may jump forward or backward. A SHOW event after a large PTS jump almost certainly belongs to a new segment. If your player tracks the currently displayed caption by `start_ms`, treat a jump of more than a few seconds as a hard reset — clear any pending caption immediately.
+- **PTS discontinuities** (seek, channel change, splice): `pts_ms` values may jump forward or backward. A SHOW event after a large PTS jump almost certainly belongs to a new segment. Treat a jump of more than a few seconds as a hard reset — clear any pending caption immediately.
 - **Roll-up captions** (RU2/RU3/RU4): each scroll step fires a new SHOW event on the same `field`/`channel` pair. The new SHOW replaces the previous one; do not stack them. Use the `field` and `channel` fields to match SHOW and CLEAR events to the right display slot.
 - **608 fields arrive separately**: field 1 and field 2 carry independent caption streams. Each fires its own interleaved SHOW/CLEAR events. Maintain a separate display slot per `(field, channel)` pair.
 

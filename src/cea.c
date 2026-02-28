@@ -203,6 +203,12 @@ struct cea_ctx
 	/* last current_visible_start_ms we reported per CC channel
 	 * index 0=CC1, 1=CC2, 2=CC3, 3=CC4 */
 	int64_t live_screen_start_ms[4];
+	/* Absolute PTS calibration for live callbacks.
+	 * pts_abs_offset_ms = pts_ms_fed - fts_now (constant once timing is stable).
+	 * Used to convert library-internal fts_now-relative times to absolute PTS. */
+	int64_t pts_abs_offset_ms;
+	int     pts_abs_calibrated;
+	int64_t last_feed_pts_ms;    /* pts_ms from the most recent cea_feed() call */
 	/* Logger */
 	cea_log_callback log_cb;
 	void            *log_ud;
@@ -359,6 +365,18 @@ void cea_set_caption_callback(cea_ctx *ctx, cea_caption_callback cb, void *userd
 }
 
 /*
+ * Convert a library-internal fts_now-relative timestamp to an absolute PTS
+ * (same timeline as the pts_ms values passed to cea_feed).
+ * Falls back to last_feed_pts_ms when timing is not yet calibrated.
+ */
+static int64_t to_abs_pts(cea_ctx *ctx, int64_t rel_ms)
+{
+	if (ctx->pts_abs_calibrated)
+		return rel_ms + ctx->pts_abs_offset_ms;
+	return ctx->last_feed_pts_ms;
+}
+
+/*
  * fire_live_callbacks — called at the end of every cea_feed() and cea_flush().
  *
  * Phase 1: drain the completed sub-chains and emit "clear" events (end_ms known).
@@ -383,12 +401,14 @@ static void fire_live_callbacks(cea_ctx *ctx)
 		if (cap->field == 3) {
 			/* CEA-708: no Phase 2, so fire the "show" event here first */
 			cea_caption show = *cap;
+			show.pts_ms = to_abs_pts(ctx, show.start_ms);
 			show.end_ms = 0;
 			ctx->live_cb(&show, ctx->live_cb_userdata);
 		}
 
 		/* Fire the "clear" event */
 		cea_caption clr = *cap;
+		clr.pts_ms   = to_abs_pts(ctx, clr.end_ms);
 		clr.text     = NULL;
 		clr.start_ms = 0;
 		ctx->live_cb(&clr, ctx->live_cb_userdata);
@@ -433,6 +453,7 @@ static void fire_live_callbacks(cea_ctx *ctx)
 
 		cea_caption cap = {0};
 		cap.text      = text;
+		cap.pts_ms    = to_abs_pts(ctx, c->current_visible_start_ms);
 		cap.start_ms  = c->current_visible_start_ms;
 		cap.end_ms    = 0;
 		cap.field     = (f < 2) ? 1 : 2;
@@ -568,6 +589,14 @@ int cea_feed(cea_ctx *ctx, const unsigned char *cc_data, int cc_count, int64_t p
 	ctx->timing->current_picture_coding_type = CEA_FRAME_TYPE_I_FRAME;
 	set_current_pts(ctx->timing, pts_ticks);
 	set_fts(ctx->timing);
+
+	/* Update absolute PTS calibration every feed so it stays accurate through
+	 * any PTS jump (fts_offset changes during jumps, so does the offset). */
+	ctx->last_feed_pts_ms = pts_ms;
+	if (ctx->timing->pts_set == 2 /* MinPtsSet */) {
+		ctx->pts_abs_offset_ms  = pts_ms - ctx->timing->fts_now;
+		ctx->pts_abs_calibrated = 1;
+	}
 
 	/* Point 708 decoder at its own sub chain so it doesn't collide
 	 * with the 608 sub (which uses realloc on sub->data).  The 708
