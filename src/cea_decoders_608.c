@@ -272,17 +272,22 @@ void handle_text_attr(const unsigned char c1, const unsigned char c2, cea_decode
 	else
 	{
 		int i = c2 - 0x20;
-		context->current_color = pac2_attribs[i][0];
-		context->font = pac2_attribs[i][1];
+		// Mid-row codes put a non-transparent space at the current position with
+		// the OLD attributes, then the new attributes take effect for subsequent
+		// characters.
+		write_char(0x20, context);
+		// Italic MRCs (0x2e/0x2f) encode {COL_WHITE, FONT_ITALICS} in the spec
+		// table, but we preserve the current color so that a preceding color MRC
+		// and an italic MRC can combine into e.g. cyan-italic.
+		enum font_bits new_font = pac2_attribs[i][1];
+		if (new_font != FONT_ITALICS && new_font != FONT_UNDERLINED_ITALICS)
+			context->current_color = pac2_attribs[i][0];
+		context->font = new_font;
 		dbg_print(
 		    CEA_DMT_DECODER_608,
 		    "  --  Color: %s,  font: %s\n",
 		    color_text[context->current_color][0],
 		    font_text[context->font]);
-		// Mid-row codes should put a non-transparent space at the current position
-		// and advance the cursor
-		// so use write_char
-		write_char(0x20, context);
 	}
 }
 
