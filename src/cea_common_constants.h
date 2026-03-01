@@ -9,6 +9,7 @@
 #ifndef CEA_CONSTANTS_H
 #define CEA_CONSTANTS_H
 
+#include <stdint.h>
 #include <stdio.h>
 
 #ifndef __cplusplus
