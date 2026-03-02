@@ -10,6 +10,7 @@
 #define _CEA_COMMON_STRUCTS
 
 #include "cea_common_constants.h"
+#include "cea.h"
 
 enum subtype
 {
@@ -29,7 +30,7 @@ struct cc_subtitle
 	int flags;
 	int got_output;
 
-	char mode[5];
+	cea_mode mode;
 	char info[4];
 
 	struct cc_subtitle *next;

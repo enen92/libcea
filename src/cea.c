@@ -25,20 +25,21 @@ const char *cea_version(void)
 	return CEA_VERSION_STRING;
 }
 
-/* Map cc_modes enum to short mode string */
-static const char *mode_str(enum cc_modes mode)
+/* Map internal cc_modes to public cea_mode */
+static cea_mode cc_mode_to_cea(enum cc_modes m)
 {
-	switch (mode)
+	switch (m)
 	{
-		case MODE_POPON:        return "POP";
-		case MODE_ROLLUP_2:     return "RU2";
-		case MODE_ROLLUP_3:     return "RU3";
-		case MODE_ROLLUP_4:     return "RU4";
-		case MODE_TEXT:         return "TXT";
-		case MODE_PAINTON:      return "PAI";
-		default:                return "";
+		case MODE_POPON:    return CEA_MODE_POPON;
+		case MODE_ROLLUP_2: return CEA_MODE_ROLLUP_2;
+		case MODE_ROLLUP_3: return CEA_MODE_ROLLUP_3;
+		case MODE_ROLLUP_4: return CEA_MODE_ROLLUP_4;
+		case MODE_TEXT:     return CEA_MODE_TEXT;
+		case MODE_PAINTON:  return CEA_MODE_PAINTON;
+		default:            return CEA_MODE_UNKNOWN;
 	}
 }
+
 
 /* Map 608 color enum to HTML hex string. Returns NULL for default/transparent. */
 static const char *color_608_hex(enum cea_decoder_608_color_code c)
@@ -284,8 +285,7 @@ static void collect_captions(cea_ctx *ctx)
 				else
 					ctx->captions[idx].field = 1;
 				ctx->captions[idx].base_row = s->flags; /* set by 708 output */
-				strncpy(ctx->captions[idx].mode, s->mode, 4);
-				ctx->captions[idx].mode[4] = '\0';
+				ctx->captions[idx].mode = s->mode;
 				strncpy(ctx->captions[idx].info, "708", 3);
 				ctx->captions[idx].info[3] = '\0';
 				idx++;
@@ -307,8 +307,7 @@ static void collect_captions(cea_ctx *ctx)
 					ctx->captions[idx].field = screen->my_field;
 					ctx->captions[idx].channel = screen->my_channel;
 					ctx->captions[idx].base_row = bottom_row;
-					strncpy(ctx->captions[idx].mode, mode_str(screen->mode), 4);
-					ctx->captions[idx].mode[4] = '\0';
+					ctx->captions[idx].mode = cc_mode_to_cea(screen->mode);
 					strncpy(ctx->captions[idx].info, "608", 3);
 					ctx->captions[idx].info[3] = '\0';
 					idx++;
@@ -459,8 +458,7 @@ static void fire_live_callbacks(cea_ctx *ctx)
 		cap.field     = (f < 2) ? 1 : 2;
 		cap.channel   = (f % 2) + 1;
 		cap.base_row  = bottom_row;
-		strncpy(cap.mode, mode_str(c->mode), 4);
-		cap.mode[4]   = '\0';
+		cap.mode      = cc_mode_to_cea(c->mode);
 		strncpy(cap.info, "608", 3);
 		cap.info[3]   = '\0';
 

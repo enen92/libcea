@@ -55,7 +55,7 @@ void millis_to_time(int64_t milli, unsigned *hours, unsigned *minutes, unsigned 
 void freep(void *arg);
 unsigned char *debug_608_to_ASC(unsigned char *ccdata, int channel);
 int add_cc_sub_text(struct cc_subtitle *sub, char *str, int64_t start_time,
-		    int64_t end_time, char *info, char *mode);
+		    int64_t end_time, char *info, cea_mode mode);
 
 extern int cc608_parity_table[256];
 void build_parity_table(void);

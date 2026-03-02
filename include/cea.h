@@ -61,6 +61,29 @@ typedef enum {
  */
 void cea_set_debug_mask(cea_ctx *ctx, int64_t mask);
 
+/*
+ * Caption display mode.
+ *
+ * The high nibble encodes the mode family; the low nibble carries extra data
+ * (rollup line count for rollup modes, 0 for others).
+ *
+ *   CEA_IS_ROLLUP(m)    — true for any rollup variant
+ *   CEA_ROLLUP_LINES(m) — rollup line count (2, 3, or 4)
+ */
+typedef enum {
+	CEA_MODE_UNKNOWN  = 0x00,
+	CEA_MODE_POPON    = 0x10,
+	CEA_MODE_PAINTON  = 0x20,
+	CEA_MODE_TEXT     = 0x30,
+	CEA_MODE_ROLLUP   = 0x40,  /* rollup, line count unknown */
+	CEA_MODE_ROLLUP_2 = 0x41,
+	CEA_MODE_ROLLUP_3 = 0x42,
+	CEA_MODE_ROLLUP_4 = 0x43,
+} cea_mode;
+
+#define CEA_IS_ROLLUP(m)    (((m) & 0xf0) == CEA_MODE_ROLLUP)
+#define CEA_ROLLUP_LINES(m) ((m) & 0x0f)
+
 /* Caption output */
 typedef struct {
 	const char *text;   /* UTF-8 caption text (one line per row, \n separated) */
@@ -79,7 +102,7 @@ typedef struct {
 	                     *   field=2, channel=2 → CC4
 	                     * CEA-708: service number (1-based). */
 	int base_row;       /* Bottom-most screen row with content (0-14 for 608, -1 if unknown) */
-	char mode[5];       /* Caption mode: "POP", "RU2", "RU3", "RU4", "PAI", "TXT" */
+	cea_mode mode;      /* Caption mode (see cea_mode enum above) */
 	char info[4];       /* Decoder info: "608" or "708" */
 } cea_caption;
 

@@ -74,7 +74,7 @@ void freep(void *arg)
 }
 
 int add_cc_sub_text(struct cc_subtitle *sub, char *str, int64_t start_time,
-		    int64_t end_time, char *info, char *mode)
+		    int64_t end_time, char *info, cea_mode mode)
 {
 	if (str == NULL || strlen(str) == 0)
 		return 0;
@@ -95,8 +95,7 @@ int add_cc_sub_text(struct cc_subtitle *sub, char *str, int64_t start_time,
 	sub->end_time = end_time;
 	if (info)
 		strncpy(sub->info, info, 4);
-	if (mode)
-		strncpy(sub->mode, mode, 4);
+	sub->mode = mode;
 	sub->got_output = 1;
 	sub->next = NULL;
 

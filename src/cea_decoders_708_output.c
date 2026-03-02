@@ -183,7 +183,7 @@ int dtvcc_screen_to_subtitle(dtvcc_tv_screen *tv, struct cc_subtitle *sub)
 	char info_str[4];
 	snprintf(info_str, sizeof(info_str), "7%02d", tv->service_number);
 	int ret = add_cc_sub_text(sub, buf, tv->time_ms_show, tv->time_ms_hide,
-				  info_str, "POP");
+				  info_str, CEA_MODE_POPON);
 
 	/* Store bottom row on the node that add_cc_sub_text just wrote.
 	 * It's always the tail of the chain. */

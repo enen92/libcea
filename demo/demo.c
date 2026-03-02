@@ -39,6 +39,19 @@ static void log_callback(cea_log_level level, const char *msg, void *userdata)
 	printf("%s %s\n", prefix[level], msg);
 }
 
+static const char *cea_mode_str(cea_mode m)
+{
+	switch (m) {
+		case CEA_MODE_POPON:    return "POP";
+		case CEA_MODE_ROLLUP_2: return "RU2";
+		case CEA_MODE_ROLLUP_3: return "RU3";
+		case CEA_MODE_ROLLUP_4: return "RU4";
+		case CEA_MODE_PAINTON:  return "PAI";
+		case CEA_MODE_TEXT:     return "TXT";
+		default:                return "???";
+	}
+}
+
 /* ------------------------------------------------------------------ */
 /* Live caption callback                                               */
 /*                                                                     */
@@ -57,7 +70,7 @@ static void live_caption_cb(const cea_caption *cap, void *userdata)
 	if (cap->text) {
 		/* Caption appearing */
 		printf("[SHOW] field=%d channel=%d row=%d mode=%s info=%s start=%lld ms\n",
-		       cap->field, cap->channel, cap->base_row, cap->mode, cap->info,
+		       cap->field, cap->channel, cap->base_row, cea_mode_str(cap->mode), cap->info,
 		       (long long)cap->start_ms);
 		const char *p = cap->text;
 		while (*p) {
