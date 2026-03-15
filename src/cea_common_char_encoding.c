@@ -502,11 +502,10 @@ int get_char_in_utf_8(unsigned char *buffer, unsigned char c) // Returns number 
 		case 0x98: // asterisk
 			*buffer = 0x2a;
 			return 1;
-		case 0x99: // Closing single quote (U+2019)
-			*buffer = 0xe2;
-			*(buffer + 1) = 0x80;
-			*(buffer + 2) = 0x99;
-			return 3;
+		case 0x99: // Plain (non-curled) single quote (U+0027). Per EIA-608 spec NOTE5:
+			// "The plain (non-curled) single quote is ambidextrous (symmetrical)".
+			*buffer = 0x27;
+			return 1;
 		case 0x9a: // em dash
 			*buffer = 0xe2;
 			*(buffer + 1) = 0x80;
