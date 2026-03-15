@@ -490,9 +490,11 @@ int get_char_in_utf_8(unsigned char *buffer, unsigned char c) // Returns number 
 			*buffer = 0xc3;
 			*(buffer + 1) = 0xbc;
 			return 2;
-		case 0x96: // apostrophe
-			*buffer = 0x27;
-			return 1;
+		case 0x96: // Opening single quote (U+2018)
+			*buffer = 0xe2;
+			*(buffer + 1) = 0x80;
+			*(buffer + 2) = 0x98;
+			return 3;
 		case 0x97: // inverted exclamation mark
 			*buffer = 0xc2;
 			*(buffer + 1) = 0xa1;
@@ -500,9 +502,11 @@ int get_char_in_utf_8(unsigned char *buffer, unsigned char c) // Returns number 
 		case 0x98: // asterisk
 			*buffer = 0x2a;
 			return 1;
-		case 0x99: // Plain single quote
-			*buffer = 0x27;
-			return 1;
+		case 0x99: // Closing single quote (U+2019)
+			*buffer = 0xe2;
+			*(buffer + 1) = 0x80;
+			*(buffer + 2) = 0x99;
+			return 3;
 		case 0x9a: // em dash
 			*buffer = 0xe2;
 			*(buffer + 1) = 0x80;
