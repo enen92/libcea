@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(cea VERSION 0.1.4 LANGUAGES C)
+project(cea VERSION 0.1.5 LANGUAGES C)
 
 # Set C standard
 set(CMAKE_C_STANDARD 99)
