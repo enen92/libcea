@@ -124,7 +124,7 @@ static char *screen_608_to_styled_text(struct eia608_screen *screen, int *out_bo
 			/* Open tags if needed */
 			if (hex && cur_color != hex)
 			{
-				len += sprintf(buf + len, "<font color=\"%s\">", hex);
+				len += snprintf(buf + len, cap - len, "<font color=\"%s\">", hex);
 				cur_color = hex;
 			}
 			if (want_italic && !cur_italic)
@@ -286,7 +286,7 @@ static void collect_captions(cea_ctx *ctx)
 					ctx->captions[idx].field = 1;
 				ctx->captions[idx].base_row = s->flags; /* set by 708 output */
 				ctx->captions[idx].mode = s->mode;
-				strncpy(ctx->captions[idx].info, "708", 3);
+				memcpy(ctx->captions[idx].info, "708", 3);
 				ctx->captions[idx].info[3] = '\0';
 				idx++;
 			}
@@ -308,7 +308,7 @@ static void collect_captions(cea_ctx *ctx)
 					ctx->captions[idx].channel = screen->my_channel;
 					ctx->captions[idx].base_row = bottom_row;
 					ctx->captions[idx].mode = cc_mode_to_cea(screen->mode);
-					strncpy(ctx->captions[idx].info, "608", 3);
+					memcpy(ctx->captions[idx].info, "608", 3);
 					ctx->captions[idx].info[3] = '\0';
 					idx++;
 				}
@@ -459,7 +459,7 @@ static void fire_live_callbacks(cea_ctx *ctx)
 		cap.channel   = (f % 2) + 1;
 		cap.base_row  = bottom_row;
 		cap.mode      = cc_mode_to_cea(c->mode);
-		strncpy(cap.info, "608", 3);
+		memcpy(cap.info, "608", 3);
 		cap.info[3]   = '\0';
 
 		ctx->live_cb(&cap, ctx->live_cb_userdata);

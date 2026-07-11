@@ -14,6 +14,10 @@
 
 #include <stdlib.h>
 
+#ifdef _MSC_VER
+#define strdup _strdup
+#endif
+
 /* Exit codes */
 #define EXIT_OK 0
 #define EXIT_NO_INPUT_FILES 2

@@ -94,7 +94,7 @@ int add_cc_sub_text(struct cc_subtitle *sub, char *str, int64_t start_time,
 	sub->start_time = start_time;
 	sub->end_time = end_time;
 	if (info)
-		strncpy(sub->info, info, 4);
+		memcpy(sub->info, info, 4);
 	sub->mode = mode;
 	sub->got_output = 1;
 	sub->next = NULL;
