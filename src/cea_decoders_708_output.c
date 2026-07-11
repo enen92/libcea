@@ -80,7 +80,7 @@ static const char *color_708_hex(int color, char *buf)
 	unsigned char r = tbl[(color >> 4) & 3];
 	unsigned char g = tbl[(color >> 2) & 3];
 	unsigned char b = tbl[color & 3];
-	sprintf(buf, "#%02X%02X%02X", r, g, b);
+	snprintf(buf, 8, "#%02X%02X%02X", r, g, b);
 	return buf;
 }
 
@@ -142,7 +142,7 @@ int dtvcc_screen_to_subtitle(dtvcc_tv_screen *tv, struct cc_subtitle *sub)
 				const char *hex = color_708_hex(want_fg, color_buf);
 				if (hex)
 				{
-					buf_len += sprintf(buf + buf_len, "<font color=\"%s\">", hex);
+					buf_len += snprintf(buf + buf_len, buf_capacity - buf_len, "<font color=\"%s\">", hex);
 					has_font_tag = 1;
 				}
 			}
